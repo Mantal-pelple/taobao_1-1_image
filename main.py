@@ -76,14 +76,18 @@ def deal_with_picture(full_path):
 
 
 def run():
-    imgList = os.listdir(img_path)
-    text = ""
-    for imgName in imgList:
-        temp_path = os.path.join(img_path, imgName)
-        if is_image_file(temp_path):
-            text += deal_with_picture(temp_path) + "\n"
+    img_path = editor.get()
+    try:
+        imgList = os.listdir(img_path)
+        text = ""
+        for imgName in imgList:
+            temp_path = os.path.join(img_path, imgName)
+            if is_image_file(temp_path):
+                text += deal_with_picture(temp_path) + "\n"
 
-    label.config(text=text)
+        label.config(text=text)
+    except Exception:
+        label.config(text="没找到该目录")
 
 
 button = tk.Button(root, text="直接运行", command=run)
