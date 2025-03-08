@@ -4,20 +4,21 @@ import threading
 import tkinter as tk
 from tkinter import filedialog
 
-from PIL import Image
+from PIL import Image, ImageOps
 from PIL.Image import Resampling
 
 global img_path
 
 # 创建主窗口
 root = tk.Tk()
-root.title("图片1/1处理程序")
-root.geometry("450x230")  # 设置窗口大小
+root.title("淘宝图片1:1处理程序")
+root.geometry("506x230")  # 设置窗口大小
+root.geometry(f"+400+130")
 
 # 添加一个编辑框
 editor = tk.Entry(root)
 editor.pack(side=tk.TOP, padx=5, pady=5, fill=tk.NONE)
-editor.config(width=40)
+editor.config(width=50)
 editor.place(x=10, y=10)
 
 
@@ -34,19 +35,18 @@ def select():
 # 添加一个按钮
 button = tk.Button(root, text="选择目录", command=select)
 button.pack(side=tk.TOP, padx=5, fill=tk.NONE)
-button.place(x=310, y=5)
-
+button.place(x=370, y=5)
 
 def is_image_file(filename):
     # 检查文件是否为图片
     return imghdr.what(filename) is not None
-
 
 def deal_with_picture(full_path):
     new_width = 0
     new_height = 0
     try:
         with Image.open(full_path) as img:
+            img = ImageOps.exif_transpose(img)
             width, height = img.size
             target_size = max(width, height)
             if img.mode == 'RGB':
@@ -58,6 +58,7 @@ def deal_with_picture(full_path):
 
             new_img = Image.new(img.mode, (target_size, target_size), fill_color)
             paste_position = ((target_size - width) // 2, (target_size - height) // 2)
+            print("paste_position:" + str(paste_position) + "target_size:"+str(target_size) + "img.size:" + str(img.size))
             new_img.paste(img, paste_position)
             new_img.save(full_path)
             new_width = new_img.width
@@ -92,10 +93,10 @@ def run():
 
 button = tk.Button(root, text="直接运行", command=run)
 button.pack(side=tk.TOP, padx=5, fill=tk.NONE)
-button.place(x=380, y=5)
+button.place(x=435, y=5)
 
 label = tk.Label(root, padx=0, pady=0, relief="solid", anchor='nw', justify=tk.LEFT)
-label.config(width=60, height=10)
+label.config(width=69, height=10)
 label.place(x=10, y=40)
 
 # 运行主事件循环
