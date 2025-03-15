@@ -53,6 +53,8 @@ def deal_with_picture(full_path):
                 fill_color = (255, 255, 255)
             elif img.mode == 'L':
                 fill_color = 255
+            elif img.mode == 'RGBA':
+                fill_color = (255, 255, 255, 0)
             else:
                 raise ValueError("Unsupported image mode")
 
@@ -63,8 +65,8 @@ def deal_with_picture(full_path):
             new_img.save(full_path)
             new_width = new_img.width
             new_height = new_img.height
-    except Exception:
-        return "出错了"
+    except Exception as e:
+        return str(e)
 
     while os.path.getsize(full_path) >= 1048576:
         with Image.open(full_path) as img:
