@@ -1,18 +1,24 @@
 import os
+import subprocess
+import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog, ttk
+import traceback
+from queue import Queue, Empty
+from tkinter import filedialog, ttk, messagebox
+
+import ffmpeg
 from PIL import Image, ImageOps
 from PIL.Image import Resampling
-from queue import Queue, Empty
 
 Image.MAX_IMAGE_PIXELS = None
 
-class ImageProcessorApp:
+
+class MediaProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("淘宝图片1:1处理程序")
-        self.root.geometry("506x300")  # 稍微增加高度以容纳进度条
+        self.root.title("淘宝图片/视频1:1处理程序")
+        self.root.geometry("506x350")  # 增加高度以适应更多控件
         self.root.geometry("+400+130")
 
         # 线程控制
@@ -32,6 +38,12 @@ class ImageProcessorApp:
         self.select_btn = tk.Button(self.root, text="选择目录", command=self.select_directory)
         self.select_btn.place(x=370, y=5)
 
+        # 文件类型选择
+        self.file_type = tk.StringVar(value="both")  # "image", "video", "both"
+        tk.Radiobutton(self.root, text="图片", variable=self.file_type, value="image").place(x=10, y=40)
+        tk.Radiobutton(self.root, text="视频", variable=self.file_type, value="video").place(x=80, y=40)
+        tk.Radiobutton(self.root, text="两者", variable=self.file_type, value="both").place(x=150, y=40)
+
         # 运行按钮
         self.run_btn = tk.Button(self.root, text="直接运行", command=self.start_processing)
         self.run_btn.place(x=435, y=5)
@@ -43,17 +55,17 @@ class ImageProcessorApp:
         # 信息显示区域
         self.label = tk.Label(self.root, padx=0, pady=0, relief="solid",
                               anchor='nw', justify=tk.LEFT, wraplength=480)
-        self.label.config(width=69, height=10)
+        self.label.config(width=69, height=12)
         self.label.place(x=10, y=70)
 
         # 进度条
         self.progress = ttk.Progressbar(self.root, orient=tk.HORIZONTAL,
                                         length=480, mode='determinate')
-        self.progress.place(x=10, y=270)
+        self.progress.place(x=10, y=320)
 
         # 状态标签
         self.status_label = tk.Label(self.root, text="就绪", anchor='w')
-        self.status_label.place(x=10, y=245, width=480)
+        self.status_label.place(x=10, y=295, width=480)
 
     def select_directory(self):
         img_path = filedialog.askdirectory()
@@ -80,8 +92,8 @@ class ImageProcessorApp:
 
         # 启动处理线程
         self.thread = threading.Thread(
-            target=self.process_images,
-            args=(img_path,),
+            target=self.process_files,
+            args=(img_path, self.file_type.get()),
             daemon=True
         )
         self.thread.start()
@@ -93,29 +105,44 @@ class ImageProcessorApp:
             self.run_btn.config(state=tk.NORMAL)
             self.stop_btn.config(state=tk.DISABLED)
 
-    def process_images(self, img_path):
+    def process_files(self, img_path, file_type):
         try:
-            img_list = [f for f in os.listdir(img_path)]
+            # 根据选择的文件类型筛选文件
+            img_list = []
+            for f in os.listdir(img_path):
+                full_path = os.path.join(img_path, f)
+                if file_type == "image" and f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                    img_list.append(f)
+                elif file_type == "video" and f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
+                    img_list.append(f)
+                elif file_type == "both" and f.lower().endswith(
+                        ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.mp4', '.mov', '.avi', '.mkv')):
+                    img_list.append(f)
+
             total = len(img_list)
 
-            for i, img_name in enumerate(img_list, 1):
+            for i, file_name in enumerate(img_list, 1):
                 if not self.processing:
                     break
 
-                full_path = os.path.join(img_path, img_name)
-                result = self.deal_with_picture(full_path)
+                full_path = os.path.join(img_path, file_name)
+
+                if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                    result = self.process_image(full_path)
+                else:
+                    result = self.process_video(full_path)
 
                 # 更新进度和结果
                 progress = (i / total) * 100
                 self.message_queue.put((
-                    f"{img_name}: {result}\n",
+                    f"{file_name}: {result}\n",
                     progress,
                     f"处理中: {i}/{total} ({progress:.1f}%)"
                 ))
 
             if self.processing:
                 self.message_queue.put((
-                    "\n所有图片处理完成！",
+                    "\n所有文件处理完成！",
                     100,
                     "处理完成"
                 ))
@@ -128,9 +155,7 @@ class ImageProcessorApp:
         finally:
             self.message_queue.put((None, None, None))  # 结束信号
 
-    def deal_with_picture(self, full_path):
-        new_width = 0
-        new_height = 0
+    def process_image(self, full_path):
         try:
             with Image.open(full_path) as img:
                 img = ImageOps.exif_transpose(img)
@@ -160,9 +185,59 @@ class ImageProcessorApp:
                     img_resized = img.resize((new_width, new_height), Resampling.LANCZOS)
                     img_resized.save(full_path)
 
-            return f"({new_width}, {new_height})"
+            return f"图片处理完成 ({new_width}, {new_height})"
         except Exception as e:
-            return f"错误: {str(e)}"
+            return f"图片处理错误: {str(e)}"
+
+    def process_video(self, full_path):
+        try:
+            # 使用ffmpeg处理视频
+            probe = ffmpeg.probe(full_path)
+            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+
+            if not video_stream:
+                return "未找到视频流"
+
+            width = int(video_stream['width'])
+            height = int(video_stream['height'])
+            target_size = max(width, height)
+
+            # 创建临时文件
+            temp_path = full_path + ".temp.mp4"
+
+            # 构建ffmpeg命令
+            (
+                ffmpeg
+                .input(full_path)
+                .filter('pad', target_size, target_size, '(ow-iw)/2', '(oh-ih)/2')
+                .output(temp_path, crf=23, preset='fast')
+                .overwrite_output()
+                .run(quiet=True, capture_stdout=True, capture_stderr=True)
+            )
+
+            # 替换原文件
+            # os.remove(full_path)
+            os.replace(temp_path, full_path)
+
+            # 检查文件大小并压缩
+            while os.path.getsize(full_path) >= 1048576 * 10 and self.processing:  # 视频限制为10MB
+                # 压缩视频
+                temp_path = full_path + ".compressed.mp4"
+                (
+                    ffmpeg
+                    .input(full_path)
+                    .output(temp_path, crf=28, preset='fast', video_bitrate='1000k')
+                    .overwrite_output()
+                    .run(quiet=True, capture_stdout=True, capture_stderr=True)
+                )
+                # os.remove(full_path)
+                os.replace(temp_path, full_path)
+
+            return "视频处理完成"
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_traceback)
+            return f"视频处理错误: {str(e)}"
 
     def check_queue(self):
         try:
@@ -196,6 +271,13 @@ class ImageProcessorApp:
 
 
 if __name__ == "__main__":
+    # 检查ffmpeg是否安装
+    try:
+        subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except:
+        tk.messagebox.showerror("错误", "请先安装ffmpeg并确保它在系统路径中")
+        exit(1)
+
     root = tk.Tk()
-    app = ImageProcessorApp(root)
+    app = MediaProcessorApp(root)
     root.mainloop()
