@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -12,9 +13,11 @@ from PIL import Image, ImageOps
 from PIL.Image import Resampling
 
 Image.MAX_IMAGE_PIXELS = None
+img_path = ""
 
 
 class MediaProcessorApp:
+
     def __init__(self, root):
         self.root = root
         self.root.title("淘宝图片/视频1:1处理程序")
@@ -67,20 +70,23 @@ class MediaProcessorApp:
         self.status_label = tk.Label(self.root, text="就绪", anchor='w')
         self.status_label.place(x=10, y=295, width=480)
 
+    def set_input_text(self, text):
+        self.editor.delete(0, tk.END)
+        self.editor.insert(0, text)
+
     def select_directory(self):
+        global img_path
         img_path = filedialog.askdirectory()
         if img_path:
-            self.editor.delete(0, tk.END)
-            self.editor.insert(0, img_path)
             self.start_processing()
 
     def start_processing(self):
+        global img_path
         if self.processing:
             return
 
-        img_path = self.editor.get()
         if not img_path or not os.path.isdir(img_path):
-            self.update_status("错误: 目录不存在")
+            self.update_status("错误: 目录" + img_path + "不存在")
             return
 
         self.processing = True
@@ -96,7 +102,25 @@ class MediaProcessorApp:
             args=(img_path, self.file_type.get()),
             daemon=True
         )
+        self.jump_to_next_dir()
         self.thread.start()
+
+    def jump_to_next_dir(self, ):
+        global img_path
+        # 调整下个目录
+        pattern = r"\(\d+\)"
+        resultList = re.findall(pattern, img_path)
+        if len(resultList) > 0:
+            newPattern = r"\d+"
+            digitalList = re.findall(newPattern, resultList[0])
+            digital = int(digitalList[0])
+            digital = digital + 1
+            temp = "(" + str(digital) + ")"
+            img_path = re.sub(pattern, temp, img_path)
+        else:
+            img_path = img_path + " (2)"
+
+        self.set_input_text(img_path)
 
     def stop_processing(self):
         if self.processing:
