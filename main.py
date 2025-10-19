@@ -82,6 +82,10 @@ class MediaProcessorApp:
 
     def start_processing(self):
         global img_path
+        real_path = self.editor.get()
+        if real_path is not None and real_path != "" and real_path != img_path:
+            img_path = real_path
+
         if self.processing:
             return
 
@@ -102,7 +106,6 @@ class MediaProcessorApp:
             args=(img_path, self.file_type.get()),
             daemon=True
         )
-        self.jump_to_next_dir()
         self.thread.start()
 
     def jump_to_next_dir(self, ):
@@ -178,40 +181,42 @@ class MediaProcessorApp:
             ))
         finally:
             self.message_queue.put((None, None, None))  # 结束信号
+            self.jump_to_next_dir() # 跳转到下个目录
 
     def process_image(self, full_path):
-        try:
-            with Image.open(full_path) as img:
-                img = ImageOps.exif_transpose(img)
-                width, height = img.size
-                target_size = max(width, height)
-
-                if img.mode == 'RGB':
-                    fill_color = (255, 255, 255)
-                elif img.mode == 'L':
-                    fill_color = 255
-                elif img.mode == 'RGBA':
-                    fill_color = (255, 255, 255, 0)
-                else:
-                    raise ValueError("不支持的图片模式")
-
-                new_img = Image.new(img.mode, (target_size, target_size), fill_color)
-                paste_position = ((target_size - width) // 2, (target_size - height) // 2)
-                new_img.paste(img, paste_position)
-                new_img.save(full_path)
-                new_width, new_height = new_img.size
-
-            # 压缩图片直到小于1MB
-            while os.path.getsize(full_path) >= 1048576 and self.processing:
-                with Image.open(full_path) as img:
-                    new_width = img.width // 2
-                    new_height = img.height // 2
-                    img_resized = img.resize((new_width, new_height), Resampling.LANCZOS)
-                    img_resized.save(full_path)
-
-            return f"图片处理完成 ({new_width}, {new_height})"
-        except Exception as e:
-            return f"图片处理错误: {str(e)}"
+        pass
+        # try:
+        #     with Image.open(full_path) as img:
+        #         img = ImageOps.exif_transpose(img)
+        #         width, height = img.size
+        #         target_size = max(width, height)
+        #
+        #         if img.mode == 'RGB':
+        #             fill_color = (255, 255, 255)
+        #         elif img.mode == 'L':
+        #             fill_color = 255
+        #         elif img.mode == 'RGBA':
+        #             fill_color = (255, 255, 255, 0)
+        #         else:
+        #             raise ValueError("不支持的图片模式")
+        #
+        #         new_img = Image.new(img.mode, (target_size, target_size), fill_color)
+        #         paste_position = ((target_size - width) // 2, (target_size - height) // 2)
+        #         new_img.paste(img, paste_position)
+        #         new_img.save(full_path)
+        #         new_width, new_height = new_img.size
+        #
+        #     # 压缩图片直到小于1MB
+        #     while os.path.getsize(full_path) >= 1048576 and self.processing:
+        #         with Image.open(full_path) as img:
+        #             new_width = img.width // 2
+        #             new_height = img.height // 2
+        #             img_resized = img.resize((new_width, new_height), Resampling.LANCZOS)
+        #             img_resized.save(full_path)
+        #
+        #     return f"图片处理完成 ({new_width}, {new_height})"
+        # except Exception as e:
+        #     return f"图片处理错误: {str(e)}"
 
     def process_video(self, full_path):
         try:
