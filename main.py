@@ -184,89 +184,89 @@ class MediaProcessorApp:
             self.jump_to_next_dir() # 跳转到下个目录
 
     def process_image(self, full_path):
-        pass
-        # try:
-        #     with Image.open(full_path) as img:
-        #         img = ImageOps.exif_transpose(img)
-        #         width, height = img.size
-        #         target_size = max(width, height)
-        #
-        #         if img.mode == 'RGB':
-        #             fill_color = (255, 255, 255)
-        #         elif img.mode == 'L':
-        #             fill_color = 255
-        #         elif img.mode == 'RGBA':
-        #             fill_color = (255, 255, 255, 0)
-        #         else:
-        #             raise ValueError("不支持的图片模式")
-        #
-        #         new_img = Image.new(img.mode, (target_size, target_size), fill_color)
-        #         paste_position = ((target_size - width) // 2, (target_size - height) // 2)
-        #         new_img.paste(img, paste_position)
-        #         new_img.save(full_path)
-        #         new_width, new_height = new_img.size
-        #
-        #     # 压缩图片直到小于1MB
-        #     while os.path.getsize(full_path) >= 1048576 and self.processing:
-        #         with Image.open(full_path) as img:
-        #             new_width = img.width // 2
-        #             new_height = img.height // 2
-        #             img_resized = img.resize((new_width, new_height), Resampling.LANCZOS)
-        #             img_resized.save(full_path)
-        #
-        #     return f"图片处理完成 ({new_width}, {new_height})"
-        # except Exception as e:
-        #     return f"图片处理错误: {str(e)}"
+        try:
+            with Image.open(full_path) as img:
+                img = ImageOps.exif_transpose(img)
+                width, height = img.size
+                target_size = max(width, height)
+
+                if img.mode == 'RGB':
+                    fill_color = (255, 255, 255)
+                elif img.mode == 'L':
+                    fill_color = 255
+                elif img.mode == 'RGBA':
+                    fill_color = (255, 255, 255, 0)
+                else:
+                    raise ValueError("不支持的图片模式")
+
+                new_img = Image.new(img.mode, (target_size, target_size), fill_color)
+                paste_position = ((target_size - width) // 2, (target_size - height) // 2)
+                new_img.paste(img, paste_position)
+                new_img.save(full_path)
+                new_width, new_height = new_img.size
+
+            # 压缩图片直到小于1MB
+            while os.path.getsize(full_path) >= 1048576 and self.processing:
+                with Image.open(full_path) as img:
+                    new_width = img.width // 2
+                    new_height = img.height // 2
+                    img_resized = img.resize((new_width, new_height), Resampling.LANCZOS)
+                    img_resized.save(full_path)
+
+            return f"图片处理完成 ({new_width}, {new_height})"
+        except Exception as e:
+            return f"图片处理错误: {str(e)}"
 
     def process_video(self, full_path):
-        try:
-            # 使用ffmpeg处理视频
-            probe = ffmpeg.probe(full_path)
-            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-
-            if not video_stream:
-                return "未找到视频流"
-
-            width = int(video_stream['width'])
-            height = int(video_stream['height'])
-            target_size = max(width, height)
-
-            # 创建临时文件
-            temp_path = full_path + ".temp.mp4"
-
-            # 构建ffmpeg命令
-            (
-                ffmpeg
-                .input(full_path)
-                .filter('pad', target_size, target_size, '(ow-iw)/2', '(oh-ih)/2')
-                .output(temp_path, crf=23, preset='fast')
-                .overwrite_output()
-                .run(quiet=True, capture_stdout=True, capture_stderr=True)
-            )
-
-            # 替换原文件
-            # os.remove(full_path)
-            os.replace(temp_path, full_path)
-
-            # 检查文件大小并压缩
-            while os.path.getsize(full_path) >= 1048576 * 10 and self.processing:  # 视频限制为10MB
-                # 压缩视频
-                temp_path = full_path + ".compressed.mp4"
-                (
-                    ffmpeg
-                    .input(full_path)
-                    .output(temp_path, crf=28, preset='fast', video_bitrate='1000k')
-                    .overwrite_output()
-                    .run(quiet=True, capture_stdout=True, capture_stderr=True)
-                )
-                # os.remove(full_path)
-                os.replace(temp_path, full_path)
-
-            return "视频处理完成"
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_traceback)
-            return f"视频处理错误: {str(e)}"
+        pass
+        # try:
+        #     # 使用ffmpeg处理视频
+        #     probe = ffmpeg.probe(full_path)
+        #     video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+        #
+        #     if not video_stream:
+        #         return "未找到视频流"
+        #
+        #     width = int(video_stream['width'])
+        #     height = int(video_stream['height'])
+        #     target_size = max(width, height)
+        #
+        #     # 创建临时文件
+        #     temp_path = full_path + ".temp.mp4"
+        #
+        #     # 构建ffmpeg命令
+        #     (
+        #         ffmpeg
+        #         .input(full_path)
+        #         .filter('pad', target_size, target_size, '(ow-iw)/2', '(oh-ih)/2')
+        #         .output(temp_path, crf=23, preset='fast')
+        #         .overwrite_output()
+        #         .run(quiet=True, capture_stdout=True, capture_stderr=True)
+        #     )
+        #
+        #     # 替换原文件
+        #     # os.remove(full_path)
+        #     os.replace(temp_path, full_path)
+        #
+        #     # 检查文件大小并压缩
+        #     while os.path.getsize(full_path) >= 1048576 * 10 and self.processing:  # 视频限制为10MB
+        #         # 压缩视频
+        #         temp_path = full_path + ".compressed.mp4"
+        #         (
+        #             ffmpeg
+        #             .input(full_path)
+        #             .output(temp_path, crf=28, preset='fast', video_bitrate='1000k')
+        #             .overwrite_output()
+        #             .run(quiet=True, capture_stdout=True, capture_stderr=True)
+        #         )
+        #         # os.remove(full_path)
+        #         os.replace(temp_path, full_path)
+        #
+        #     return "视频处理完成"
+        # except Exception as e:
+        #     exc_type, exc_value, exc_traceback = sys.exc_info()
+        #     traceback.print_exception(exc_type, exc_value, exc_traceback)
+        #     return f"视频处理错误: {str(e)}"
 
     def check_queue(self):
         try:
